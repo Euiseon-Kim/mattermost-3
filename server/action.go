@@ -23,8 +23,18 @@ func (p *Plugin) handleDiffAction(w http.ResponseWriter, r *http.Request) {
 
 	var req model.PostActionIntegrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeActionResponse(w, "잘못된 요청입니다.")
+		ackAction(w)
 		return
+	}
+
+	// sendEphemeral sends a message visible only to the user who clicked, then acks the button.
+	sendEphemeral := func(text string) {
+		p.API.SendEphemeralPost(req.UserId, &model.Post{
+			ChannelId: req.ChannelId,
+			UserId:    req.UserId,
+			Message:   text,
+		})
+		ackAction(w)
 	}
 
 	projectPath, _ := req.Context["project_path"].(string)
@@ -33,37 +43,35 @@ func (p *Plugin) handleDiffAction(w http.ResponseWriter, r *http.Request) {
 	mrID := int(mrIDFloat)
 
 	if projectPath == "" || filePath == "" || mrID == 0 {
-		writeActionResponse(w, "요청 파라미터가 올바르지 않습니다.")
+		sendEphemeral("요청 파라미터가 올바르지 않습니다.")
 		return
 	}
 
 	config := p.getConfiguration()
 	if err := config.IsValid(); err != nil {
-		writeActionResponse(w, "플러그인이 설정되지 않았습니다.")
+		sendEphemeral("플러그인이 설정되지 않았습니다.")
 		return
 	}
 
 	glClient, err := newGitLabClient(config.GitLabURL, config.GitLabToken)
 	if err != nil {
-		writeActionResponse(w, "GitLab 연결 실패: "+err.Error())
+		sendEphemeral("GitLab 연결 실패: " + err.Error())
 		return
 	}
 
 	diffs, err := glClient.GetMergeRequestDiffs(projectPath, mrID)
 	if err != nil {
-		writeActionResponse(w, fmt.Sprintf("MR !%d diff 조회 실패: %s", mrID, err.Error()))
+		sendEphemeral(fmt.Sprintf("MR !%d diff 조회 실패: %s", mrID, err.Error()))
 		return
 	}
 
-	writeActionResponse(w, formatFileDiff(diffs, filePath))
+	sendEphemeral(formatFileDiff(diffs, filePath))
 }
 
-func writeActionResponse(w http.ResponseWriter, text string) {
+// ackAction sends an empty acknowledgment to Mattermost after processing a button click.
+func ackAction(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
-	resp := &model.PostActionIntegrationResponse{
-		EphemeralText: text,
-	}
-	_ = json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(&model.PostActionIntegrationResponse{})
 }
 
 // buildFileButtons converts a list of MR diffs into clickable Mattermost button attachments.
