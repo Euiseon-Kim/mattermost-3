@@ -43,6 +43,20 @@
         "type": "generated",
         "help_text": "GitLab 웹훅 이벤트 검증에 사용할 시크릿 토큰",
         "regenerate_help_text": "시크릿 재생성"
+      },
+      {
+        "key": "FabrixAPIURL",
+        "display_name": "Fabrix API URL",
+        "type": "text",
+        "help_text": "채널 대화 요약에 사용할 사내 LLM API 엔드포인트 URL",
+        "placeholder": "https://fabrix.internal/api/chat"
+      },
+      {
+        "key": "FabrixAPIKey",
+        "display_name": "Fabrix API Key",
+        "type": "text",
+        "help_text": "Fabrix API 인증키 (없으면 빈칸)",
+        "secret": true
       }
     ]
   }

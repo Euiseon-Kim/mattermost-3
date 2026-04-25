@@ -12,6 +12,8 @@ type Configuration struct {
 	GitLabURL     string `json:"GitLabURL"`
 	GitLabToken   string `json:"GitLabToken"`
 	WebhookSecret string `json:"WebhookSecret"`
+	FabrixAPIURL  string `json:"FabrixAPIURL"`
+	FabrixAPIKey  string `json:"FabrixAPIKey"`
 }
 
 // IsValid checks if the configuration is valid.

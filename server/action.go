@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/mattermost/mattermost/server/public/model"
+	gitlab "github.com/xanzy/go-gitlab"
 )
 
 const (
@@ -66,6 +67,77 @@ func (p *Plugin) handleDiffAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendEphemeral(formatFileDiff(diffs, filePath))
+}
+
+// handlePostCommentAction posts a stored AI summary as a GitLab MR comment.
+func (p *Plugin) handlePostCommentAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req model.PostActionIntegrationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		ackAction(w)
+		return
+	}
+
+	sendEphemeral := func(text string) {
+		p.API.SendEphemeralPost(req.UserId, &model.Post{
+			ChannelId: req.ChannelId,
+			UserId:    req.UserId,
+			Message:   text,
+		})
+		ackAction(w)
+	}
+
+	// Handle cancel
+	if cancel, _ := req.Context["cancel"].(bool); cancel {
+		summaryKey, _ := req.Context["summary_key"].(string)
+		if summaryKey != "" {
+			p.getSummaryAndDelete(summaryKey) // clean up KV
+		}
+		sendEphemeral("취소되었습니다.")
+		return
+	}
+
+	summaryKey, _ := req.Context["summary_key"].(string)
+	projectPath, _ := req.Context["project_path"].(string)
+	mrIDFloat, _ := req.Context["mr_id"].(float64)
+	mrID := int(mrIDFloat)
+
+	if summaryKey == "" || projectPath == "" || mrID == 0 {
+		sendEphemeral("요청 파라미터가 올바르지 않습니다.")
+		return
+	}
+
+	summary, err := p.getSummaryAndDelete(summaryKey)
+	if err != nil {
+		sendEphemeral("오류: " + err.Error())
+		return
+	}
+
+	config := p.getConfiguration()
+	if err := config.IsValid(); err != nil {
+		sendEphemeral("플러그인이 설정되지 않았습니다.")
+		return
+	}
+
+	glClient, err := newGitLabClient(config.GitLabURL, config.GitLabToken)
+	if err != nil {
+		sendEphemeral("GitLab 연결 실패: " + err.Error())
+		return
+	}
+
+	noteBody := fmt.Sprintf("## AI 요약 (Mattermost 채널 대화)\n\n%s", summary)
+	_, _, glErr := glClient.client.Notes.CreateMergeRequestNote(projectPath, mrID,
+		&gitlab.CreateMergeRequestNoteOptions{Body: gitlab.Ptr(noteBody)})
+	if glErr != nil {
+		sendEphemeral(fmt.Sprintf("GitLab MR !%d 코멘트 등록 실패: %s", mrID, glErr.Error()))
+		return
+	}
+
+	sendEphemeral(fmt.Sprintf("✅ MR !%d에 코멘트가 등록되었습니다.", mrID))
 }
 
 // ackAction sends an empty acknowledgment to Mattermost after processing a button click.

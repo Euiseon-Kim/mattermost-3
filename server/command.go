@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/mattermost/mattermost/server/public/model"
 	"github.com/mattermost/mattermost/server/public/plugin"
 )
@@ -18,6 +19,7 @@ const helpText = `**GitLab Code Review 플러그인 명령어**
 * ` + "`/gitlabcr mr <id>`" + ` — MR 상세 정보 조회
 * ` + "`/gitlabcr mr diff <id>`" + ` — MR 변경 파일 목록 조회
 * ` + "`/gitlabcr mr diff <id> <파일경로>`" + ` — 특정 파일의 diff 조회
+* ` + "`/gitlabcr mr summarize <id>`" + ` — 채널 대화를 AI로 요약 후 MR 코멘트 등록
 
 **프로젝트 연결**
 * ` + "`/gitlabcr project link <project-path>`" + ` — 현재 채널을 GitLab 프로젝트에 연결 (예: ` + "`group/myproject`" + `)
@@ -53,6 +55,7 @@ func buildAutocompleteData() *model.AutocompleteData {
 	})
 	mr.AddCommand(mrList)
 	mr.AddCommand(model.NewAutocompleteData("diff", "<id> [파일경로]", "MR diff 조회"))
+	mr.AddCommand(model.NewAutocompleteData("summarize", "<id>", "채널 대화 AI 요약 후 MR 코멘트 등록"))
 	root.AddCommand(mr)
 
 	project := model.NewAutocompleteData("project", "[link|unlink|info]", "프로젝트 연결 관리")
@@ -133,6 +136,15 @@ func (p *Plugin) handleMRCommand(args *model.CommandArgs, params []string) (*mod
 		}
 		filterFile := strings.Join(params[2:], " ")
 		return p.handleMRDiff(project, glClient, mrID, filterFile)
+	case "summarize":
+		if len(params) < 2 {
+			return p.ephemeral("사용법: `/gitlabcr mr summarize <id>`"), nil
+		}
+		mrID, err := strconv.Atoi(params[1])
+		if err != nil {
+			return p.ephemeral("유효하지 않은 MR ID: " + params[1]), nil
+		}
+		return p.handleMRSummarize(args, project, glClient, mrID)
 	default:
 		mrID, err := strconv.Atoi(params[0])
 		if err != nil {
@@ -449,4 +461,101 @@ func (p *Plugin) ephemeral(message string) *model.CommandResponse {
 		ResponseType: model.CommandResponseTypeEphemeral,
 		Text:         message,
 	}
+}
+
+// handleMRSummarize summarizes recent channel messages via Fabrix API,
+// then shows a preview with a confirm button to post it as a GitLab MR comment.
+func (p *Plugin) handleMRSummarize(args *model.CommandArgs, project *ChannelProject, glClient *GitLabClient, mrID int) (*model.CommandResponse, *model.AppError) {
+	config := p.getConfiguration()
+	if config.FabrixAPIURL == "" {
+		return p.ephemeral("Fabrix API URL이 설정되지 않았습니다. 시스템 관리자에게 문의하세요."), nil
+	}
+
+	// Verify MR exists
+	mr, err := glClient.GetMergeRequest(project.ProjectPath, mrID)
+	if err != nil {
+		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, err.Error())), nil
+	}
+
+	// Fetch last 50 posts from channel
+	postList, appErr := p.API.GetPostsForChannel(args.ChannelId, 0, 50)
+	if appErr != nil {
+		return p.ephemeral("채널 메시지 조회 실패: " + appErr.Error()), nil
+	}
+
+	// Format posts as conversation text (oldest first)
+	var lines []string
+	for i := len(postList.Order) - 1; i >= 0; i-- {
+		post := postList.Posts[postList.Order[i]]
+		if post.Message == "" || post.Type != "" {
+			continue
+		}
+		user, uErr := p.API.GetUser(post.UserId)
+		username := "unknown"
+		if uErr == nil {
+			username = user.Username
+		}
+		lines = append(lines, username+": "+post.Message)
+	}
+
+	if len(lines) == 0 {
+		return p.ephemeral("요약할 채널 메시지가 없습니다."), nil
+	}
+
+	conversationText := strings.Join(lines, "\n")
+	prompt := fmt.Sprintf("User: 다음 Mattermost 채널의 코드리뷰 대화 내용을 한국어로 간결하게 요약해줘. MR !%d '%s'에 대한 주요 논의, 결정 사항, 피드백을 중심으로 요약해:\n\n%s",
+		mr.IID, mr.Title, conversationText)
+
+	// Call Fabrix API
+	summary, err := callFabrix(config.FabrixAPIURL, config.FabrixAPIKey, args.ChannelId, prompt)
+	if err != nil {
+		return p.ephemeral("AI 요약 실패: " + err.Error()), nil
+	}
+
+	// Store summary temporarily (5-minute TTL)
+	summaryKey := uuid.New().String()
+	if err := p.storeSummary(summaryKey, summary); err != nil {
+		return p.ephemeral("요약 저장 실패: " + err.Error()), nil
+	}
+
+	siteURL := ""
+	if cfg := p.API.GetConfig(); cfg != nil && cfg.ServiceSettings.SiteURL != nil {
+		siteURL = *cfg.ServiceSettings.SiteURL
+	}
+	actionURL := siteURL + "/plugins/" + pluginID + "/action/post-comment"
+
+	attachment := &model.SlackAttachment{
+		Title: fmt.Sprintf("AI 요약 미리보기 — MR !%d: %s", mr.IID, mr.Title),
+		Text:  summary,
+		Color: "#1aaa55",
+		Actions: []*model.PostAction{
+			{
+				Name: fmt.Sprintf("MR !%d에 코멘트 달기", mr.IID),
+				Type: model.PostActionTypeButton,
+				Style: "primary",
+				Integration: &model.PostActionIntegration{
+					URL: actionURL,
+					Context: map[string]interface{}{
+						"summary_key":  summaryKey,
+						"project_path": project.ProjectPath,
+						"mr_id":        mr.IID,
+					},
+				},
+			},
+			{
+				Name:  "취소",
+				Type:  model.PostActionTypeButton,
+				Style: "danger",
+				Integration: &model.PostActionIntegration{
+					URL:     actionURL,
+					Context: map[string]interface{}{"cancel": true, "summary_key": summaryKey},
+				},
+			},
+		},
+	}
+
+	return &model.CommandResponse{
+		ResponseType: model.CommandResponseTypeEphemeral,
+		Attachments:  []*model.SlackAttachment{attachment},
+	}, nil
 }
