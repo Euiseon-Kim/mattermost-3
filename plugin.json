@@ -1,0 +1,49 @@
+{
+  "id": "com.mattermost.gitlab-review",
+  "name": "GitLab Code Review",
+  "description": "GitLab Merge Request code review integration for Mattermost",
+  "homepage_url": "https://github.com/mattermost/mattermost-plugin-gitlab-review",
+  "support_url": "https://github.com/mattermost/mattermost-plugin-gitlab-review/issues",
+  "icon_path": "assets/icon.svg",
+  "version": "0.1.0",
+  "min_server_version": "7.0.0",
+  "server": {
+    "executables": {
+      "linux-amd64": "server/dist/plugin-linux-amd64",
+      "darwin-amd64": "server/dist/plugin-darwin-amd64",
+      "windows-amd64": "server/dist/plugin-windows-amd64.exe"
+    }
+  },
+  "webapp": {
+    "bundle_path": "webapp/dist/main.js"
+  },
+  "settings_schema": {
+    "header": "GitLab Code Review 플러그인 설정",
+    "footer": "GitLab Personal Access Token은 'api' 스코프가 필요합니다.",
+    "settings": [
+      {
+        "key": "GitLabURL",
+        "display_name": "GitLab URL",
+        "type": "text",
+        "help_text": "GitLab 인스턴스의 기본 URL (예: https://gitlab.com 또는 https://your-gitlab.example.com)",
+        "placeholder": "https://gitlab.com",
+        "default": "https://gitlab.com"
+      },
+      {
+        "key": "GitLabToken",
+        "display_name": "GitLab Personal Access Token",
+        "type": "text",
+        "help_text": "'api' 스코프를 가진 GitLab Personal Access Token을 입력하세요.",
+        "placeholder": "glpat-xxxxxxxxxxxxxxxxxxxx",
+        "secret": true
+      },
+      {
+        "key": "WebhookSecret",
+        "display_name": "Webhook Secret",
+        "type": "generated",
+        "help_text": "GitLab 웹훅 이벤트 검증에 사용할 시크릿 토큰",
+        "regenerate_help_text": "시크릿 재생성"
+      }
+    ]
+  }
+}
