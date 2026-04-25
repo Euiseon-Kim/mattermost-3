@@ -1,5 +1,5 @@
 PLUGIN_ID    ?= com.mattermost.gitlab-review
-PLUGIN_VERSION ?= $(shell node -e "require('./plugin.json').version" 2>/dev/null || cat plugin.json | python3 -c 'import sys,json; print(json.load(sys.stdin)["version"])')
+PLUGIN_VERSION ?= $(shell python3 -c 'import json; print(json.load(open("plugin.json"))["version"])')
 BUNDLE_NAME  ?= $(PLUGIN_ID)-$(PLUGIN_VERSION).tar.gz
 
 PLATFORMS    ?= linux/amd64 darwin/amd64 darwin/arm64 windows/amd64
