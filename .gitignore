@@ -3,7 +3,6 @@ server/dist/
 webapp/dist/
 webapp/node_modules/
 dist/
-*.tar.gz
 
 # Go
 *.test
