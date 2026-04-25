@@ -185,9 +185,23 @@ func (p *Plugin) handleMRDetails(project *ChannelProject, glClient *GitLabClient
 		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, err.Error())), nil
 	}
 
+	siteURL := ""
+	if cfg := p.API.GetConfig(); cfg != nil && cfg.ServiceSettings.SiteURL != nil {
+		siteURL = *cfg.ServiceSettings.SiteURL
+	}
+
+	var attachments []*model.SlackAttachment
+	diffs, err := glClient.GetMergeRequestDiffs(project.ProjectPath, mrID)
+	if err != nil {
+		p.API.LogWarn("MR diff 조회 실패", "mr_id", mrID, "error", err.Error())
+	} else {
+		attachments = buildFileButtons(diffs, project.ProjectPath, mr.IID, siteURL)
+	}
+
 	return &model.CommandResponse{
 		ResponseType: model.CommandResponseTypeInChannel,
 		Text:         formatMRDetails(mr),
+		Attachments:  attachments,
 	}, nil
 }
 

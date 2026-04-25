@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"sync"
 
 	"github.com/mattermost/mattermost/server/public/plugin"
@@ -30,4 +31,13 @@ func (p *Plugin) OnActivate() error {
 
 func (p *Plugin) OnDeactivate() error {
 	return nil
+}
+
+func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/action/diff":
+		p.handleDiffAction(w, r)
+	default:
+		http.NotFound(w, r)
+	}
 }
