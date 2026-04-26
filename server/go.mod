@@ -3,6 +3,7 @@ module github.com/mattermost/mattermost-plugin-gitlab-review
 go 1.21
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/mattermost/mattermost/server/public v0.1.4
 	github.com/pkg/errors v0.9.1
 	github.com/xanzy/go-gitlab v0.107.0
@@ -17,7 +18,6 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect

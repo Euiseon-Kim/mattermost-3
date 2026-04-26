@@ -85,6 +85,12 @@ func (p *Plugin) handleMRWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if p.botUserID == "" {
+		p.API.LogWarn("Bot user not initialized — webhook notification skipped. Check that bot account creation is enabled in System Console.")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	post := &model.Post{
 		ChannelId: channelID,
 		UserId:    p.botUserID,
