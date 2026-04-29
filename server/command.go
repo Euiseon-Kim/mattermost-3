@@ -10,26 +10,26 @@ import (
 	"github.com/mattermost/mattermost/server/public/plugin"
 )
 
-const commandTrigger = "gitlabcr"
+const commandTrigger = "gl"
 
 const helpText = `**GitLab Code Review 플러그인 명령어**
 
 **MR 조회**
-* ` + "`/gitlabcr mr list [state]`" + ` — MR 목록 조회 (state: open, merged, closed, all | 기본값: open)
-* ` + "`/gitlabcr mr <id>`" + ` — MR 상세 정보 조회
-* ` + "`/gitlabcr mr diff <id>`" + ` — MR 변경 파일 목록 조회
-* ` + "`/gitlabcr mr diff <id> <파일경로>`" + ` — 특정 파일의 diff 조회
-* ` + "`/gitlabcr mr summarize <id>`" + ` — 채널 대화를 AI로 요약 후 MR 코멘트 등록
+* ` + "`/gl mr list [state]`" + ` — MR 목록 조회 (state: open, merged, closed, all | 기본값: open)
+* ` + "`/gl mr <id>`" + ` — MR 상세 정보 조회
+* ` + "`/gl mr diff <id>`" + ` — MR 변경 파일 목록 조회
+* ` + "`/gl mr diff <id> <파일경로>`" + ` — 특정 파일의 diff 조회
+* ` + "`/gl mr summarize <id>`" + ` — 채널 대화를 AI로 요약 후 MR 코멘트 등록
 
 **프로젝트 연결**
-* ` + "`/gitlabcr project link <project-path>`" + ` — 현재 채널을 GitLab 프로젝트에 연결 (예: ` + "`group/myproject`" + `)
-* ` + "`/gitlabcr project unlink`" + ` — 채널의 GitLab 프로젝트 연결 해제
-* ` + "`/gitlabcr project info`" + ` — 연결된 프로젝트 정보 조회
+* ` + "`/gl project link <project-path>`" + ` — 현재 채널을 GitLab 프로젝트에 연결 (예: ` + "`group/myproject`" + `)
+* ` + "`/gl project unlink`" + ` — 채널의 GitLab 프로젝트 연결 해제
+* ` + "`/gl project info`" + ` — 연결된 프로젝트 정보 조회
 
 **채널 생성**
-* ` + "`/gitlabcr channel create <project-path>`" + ` — GitLab 프로젝트용 채널 자동 생성 및 연결
+* ` + "`/gl channel create <project-path>`" + ` — GitLab 프로젝트용 채널 자동 생성 및 연결
 
-* ` + "`/gitlabcr help`" + ` — 이 도움말 표시`
+* ` + "`/gl help`" + ` — 이 도움말 표시`
 
 func (p *Plugin) registerCommands() error {
 	return p.API.RegisterCommand(&model.Command{
@@ -102,7 +102,7 @@ func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*mo
 
 func (p *Plugin) handleMRCommand(args *model.CommandArgs, params []string) (*model.CommandResponse, *model.AppError) {
 	if len(params) == 0 {
-		return p.ephemeral("사용법: `/gitlabcr mr list|<id>|diff`"), nil
+		return p.ephemeral("사용법: `/gl mr list|<id>|diff`"), nil
 	}
 
 	config := p.getConfiguration()
@@ -115,7 +115,7 @@ func (p *Plugin) handleMRCommand(args *model.CommandArgs, params []string) (*mod
 		return p.ephemeral("프로젝트 정보 조회 실패: " + err.Error()), nil
 	}
 	if project == nil {
-		return p.ephemeral("이 채널은 GitLab 프로젝트에 연결되지 않았습니다.\n`/gitlabcr project link <project-path>` 명령어로 연결하거나, `/gitlabcr channel create <project-path>`로 새 채널을 만드세요."), nil
+		return p.ephemeral("이 채널은 GitLab 프로젝트에 연결되지 않았습니다.\n`/gl project link <project-path>` 명령어로 연결하거나, `/gl channel create <project-path>`로 새 채널을 만드세요."), nil
 	}
 
 	glClient, err := newGitLabClient(config.GitLabURL, config.GitLabToken)
@@ -128,7 +128,7 @@ func (p *Plugin) handleMRCommand(args *model.CommandArgs, params []string) (*mod
 		return p.handleMRList(project, glClient, params[1:])
 	case "diff":
 		if len(params) < 2 {
-			return p.ephemeral("사용법: `/gitlabcr mr diff <id> [파일경로]`"), nil
+			return p.ephemeral("사용법: `/gl mr diff <id> [파일경로]`"), nil
 		}
 		mrID, err := strconv.Atoi(params[1])
 		if err != nil {
@@ -138,7 +138,7 @@ func (p *Plugin) handleMRCommand(args *model.CommandArgs, params []string) (*mod
 		return p.handleMRDiff(project, glClient, mrID, filterFile)
 	case "summarize":
 		if len(params) < 2 {
-			return p.ephemeral("사용법: `/gitlabcr mr summarize <id>`"), nil
+			return p.ephemeral("사용법: `/gl mr summarize <id>`"), nil
 		}
 		mrID, err := strconv.Atoi(params[1])
 		if err != nil {
@@ -148,7 +148,7 @@ func (p *Plugin) handleMRCommand(args *model.CommandArgs, params []string) (*mod
 	default:
 		mrID, err := strconv.Atoi(params[0])
 		if err != nil {
-			return p.ephemeral(fmt.Sprintf("알 수 없는 명령어: `%s`\n`/gitlabcr help`로 도움말을 확인하세요.", params[0])), nil
+			return p.ephemeral(fmt.Sprintf("알 수 없는 명령어: `%s`\n`/gl help`로 도움말을 확인하세요.", params[0])), nil
 		}
 		return p.handleMRDetails(project, glClient, mrID)
 	}
@@ -247,13 +247,13 @@ func (p *Plugin) handleMRDiff(project *ChannelProject, glClient *GitLabClient, m
 
 func (p *Plugin) handleProjectCommand(args *model.CommandArgs, params []string) (*model.CommandResponse, *model.AppError) {
 	if len(params) == 0 {
-		return p.ephemeral("사용법: `/gitlabcr project link|unlink|info`"), nil
+		return p.ephemeral("사용법: `/gl project link|unlink|info`"), nil
 	}
 
 	switch params[0] {
 	case "link":
 		if len(params) < 2 {
-			return p.ephemeral("사용법: `/gitlabcr project link <project-path>`\n예시: `/gitlabcr project link group/myproject`"), nil
+			return p.ephemeral("사용법: `/gl project link <project-path>`\n예시: `/gl project link group/myproject`"), nil
 		}
 		return p.handleProjectLink(args, params[1])
 	case "unlink":
@@ -299,7 +299,7 @@ func (p *Plugin) handleProjectLink(args *model.CommandArgs, projectPath string) 
 
 	return &model.CommandResponse{
 		ResponseType: model.CommandResponseTypeInChannel,
-		Text: fmt.Sprintf("✅ 이 채널이 **[%s](%s)** 에 연결되었습니다.\n\n`/gitlabcr mr list`로 MR 목록을 조회할 수 있습니다.",
+		Text: fmt.Sprintf("✅ 이 채널이 **[%s](%s)** 에 연결되었습니다.\n\n`/gl mr list`로 MR 목록을 조회할 수 있습니다.",
 			gitProject.NameWithNamespace, gitProject.WebURL),
 	}, nil
 }
@@ -339,7 +339,7 @@ func (p *Plugin) handleProjectInfo(args *model.CommandArgs) (*model.CommandRespo
 		return p.ephemeral("프로젝트 정보 조회 실패: " + err.Error()), nil
 	}
 	if project == nil {
-		return p.ephemeral("이 채널은 GitLab 프로젝트에 연결되지 않았습니다.\n`/gitlabcr project link <project-path>` 명령어로 연결하세요."), nil
+		return p.ephemeral("이 채널은 GitLab 프로젝트에 연결되지 않았습니다.\n`/gl project link <project-path>` 명령어로 연결하세요."), nil
 	}
 
 	text := fmt.Sprintf("**연결된 GitLab 프로젝트:** [%s](%s)\n**경로:** `%s`",
@@ -352,10 +352,10 @@ func (p *Plugin) handleProjectInfo(args *model.CommandArgs) (*model.CommandRespo
 
 func (p *Plugin) handleChannelCommand(args *model.CommandArgs, params []string) (*model.CommandResponse, *model.AppError) {
 	if len(params) == 0 || params[0] != "create" {
-		return p.ephemeral("사용법: `/gitlabcr channel create <project-path>`"), nil
+		return p.ephemeral("사용법: `/gl channel create <project-path>`"), nil
 	}
 	if len(params) < 2 {
-		return p.ephemeral("사용법: `/gitlabcr channel create <project-path>`\n예시: `/gitlabcr channel create group/myproject`"), nil
+		return p.ephemeral("사용법: `/gl channel create <project-path>`\n예시: `/gl channel create group/myproject`"), nil
 	}
 	return p.handleChannelCreate(args, params[1])
 }
@@ -424,7 +424,7 @@ func (p *Plugin) handleChannelCreate(args *model.CommandArgs, projectPath string
 		return p.ephemeral("채널은 생성됐지만 프로젝트 연결 저장 실패: " + err.Error()), nil
 	}
 
-	return p.ephemeral(fmt.Sprintf("✅ **%s** 채널이 생성되고 **[%s](%s)** 프로젝트에 연결되었습니다.\n해당 채널에서 `/gitlabcr mr list`로 MR을 조회할 수 있습니다.",
+	return p.ephemeral(fmt.Sprintf("✅ **%s** 채널이 생성되고 **[%s](%s)** 프로젝트에 연결되었습니다.\n해당 채널에서 `/gl mr list`로 MR을 조회할 수 있습니다.",
 		channelDisplayName, gitProject.NameWithNamespace, gitProject.WebURL)), nil
 }
 
