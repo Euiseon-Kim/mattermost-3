@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -12,6 +13,52 @@ import (
 type GitLabClient struct {
 	client  *gitlab.Client
 	baseURL string
+}
+
+// friendlyGitLabError converts raw Go HTTP/network errors into user-readable Korean messages.
+// Raw errors contain GitLab API URLs which would trigger Mattermost's OG image fetcher.
+func friendlyGitLabError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "no such host"),
+		strings.Contains(msg, "name resolution failure"),
+		strings.Contains(msg, "lookup "):
+		return "GitLab 서버에 연결할 수 없습니다 (DNS 오류). 서버의 네트워크 설정을 확인하세요."
+	case strings.Contains(msg, "connection refused"):
+		return "GitLab 서버가 응답하지 않습니다 (connection refused)."
+	case strings.Contains(msg, "i/o timeout"),
+		strings.Contains(msg, "context deadline exceeded"),
+		strings.Contains(msg, "TLS handshake timeout"):
+		return "GitLab 서버 연결 시간이 초과되었습니다."
+	case strings.Contains(msg, "certificate"),
+		strings.Contains(msg, "x509"):
+		return "GitLab SSL 인증서 오류. 자체 서명 인증서라면 서버 설정을 확인하세요."
+	}
+	// Check go-gitlab HTTP error responses
+	if errResp, ok := err.(*gitlab.ErrorResponse); ok {
+		switch errResp.Response.StatusCode {
+		case http.StatusUnauthorized:
+			return "GitLab 인증 실패 (401). 토큰을 확인하세요."
+		case http.StatusForbidden:
+			return "GitLab 접근 권한이 없습니다 (403)."
+		case http.StatusNotFound:
+			return "프로젝트를 찾을 수 없습니다 (404). 경로를 확인하세요."
+		}
+	}
+	// Strip URLs from error message to avoid Mattermost OG fetch
+	if idx := strings.Index(msg, "http"); idx != -1 {
+		if colon := strings.Index(msg[idx:], ":"); colon != -1 {
+			// Return the part before the URL
+			prefix := strings.TrimSpace(msg[:idx])
+			if prefix != "" {
+				return prefix
+			}
+		}
+	}
+	return msg
 }
 
 func newGitLabClient(gitlabURL, token string) (*GitLabClient, error) {

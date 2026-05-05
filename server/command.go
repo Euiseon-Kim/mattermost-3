@@ -120,7 +120,7 @@ func (p *Plugin) handleMRCommand(args *model.CommandArgs, params []string) (*mod
 
 	glClient, err := newGitLabClient(config.GitLabURL, config.GitLabToken)
 	if err != nil {
-		return p.ephemeral("GitLab 연결 실패: " + err.Error()), nil
+		return p.ephemeral("GitLab 연결 실패: " + friendlyGitLabError(err)), nil
 	}
 
 	switch params[0] {
@@ -173,7 +173,7 @@ func (p *Plugin) handleMRList(project *ChannelProject, glClient *GitLabClient, p
 
 	mrs, err := glClient.ListMergeRequests(project.ProjectPath, state, 1)
 	if err != nil {
-		return p.ephemeral("MR 목록 조회 실패: " + err.Error()), nil
+		return p.ephemeral("MR 목록 조회 실패: " + friendlyGitLabError(err)), nil
 	}
 
 	stateLabel := state
@@ -194,7 +194,7 @@ func (p *Plugin) handleMRList(project *ChannelProject, glClient *GitLabClient, p
 func (p *Plugin) handleMRDetails(project *ChannelProject, glClient *GitLabClient, mrID int) (*model.CommandResponse, *model.AppError) {
 	mr, err := glClient.GetMergeRequest(project.ProjectPath, mrID)
 	if err != nil {
-		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, err.Error())), nil
+		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, friendlyGitLabError(err))), nil
 	}
 
 	siteURL := ""
@@ -220,12 +220,12 @@ func (p *Plugin) handleMRDetails(project *ChannelProject, glClient *GitLabClient
 func (p *Plugin) handleMRDiff(project *ChannelProject, glClient *GitLabClient, mrID int, filterFile string) (*model.CommandResponse, *model.AppError) {
 	diffs, err := glClient.GetMergeRequestDiffs(project.ProjectPath, mrID)
 	if err != nil {
-		return p.ephemeral(fmt.Sprintf("MR !%d diff 조회 실패: %s", mrID, err.Error())), nil
+		return p.ephemeral(fmt.Sprintf("MR !%d diff 조회 실패: %s", mrID, friendlyGitLabError(err))), nil
 	}
 
 	mr, err := glClient.GetMergeRequest(project.ProjectPath, mrID)
 	if err != nil {
-		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, err.Error())), nil
+		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, friendlyGitLabError(err))), nil
 	}
 
 	header := fmt.Sprintf("### Diff — [!%d %s](%s)\n\n", mr.IID, mr.Title, mr.WebURL)
@@ -273,12 +273,12 @@ func (p *Plugin) handleProjectLink(args *model.CommandArgs, projectPath string) 
 
 	glClient, err := newGitLabClient(config.GitLabURL, config.GitLabToken)
 	if err != nil {
-		return p.ephemeral("GitLab 연결 실패: " + err.Error()), nil
+		return p.ephemeral("GitLab 연결 실패: " + friendlyGitLabError(err)), nil
 	}
 
 	gitProject, err := glClient.GetProject(projectPath)
 	if err != nil {
-		return p.ephemeral(fmt.Sprintf("프로젝트 `%s`를 찾을 수 없습니다: %s", projectPath, err.Error())), nil
+		return p.ephemeral(fmt.Sprintf("프로젝트 `%s`` 조회 실패: %s", projectPath, friendlyGitLabError(err))), nil
 	}
 
 	project := &ChannelProject{
@@ -368,12 +368,12 @@ func (p *Plugin) handleChannelCreate(args *model.CommandArgs, projectPath string
 
 	glClient, err := newGitLabClient(config.GitLabURL, config.GitLabToken)
 	if err != nil {
-		return p.ephemeral("GitLab 연결 실패: " + err.Error()), nil
+		return p.ephemeral("GitLab 연결 실패: " + friendlyGitLabError(err)), nil
 	}
 
 	gitProject, err := glClient.GetProject(projectPath)
 	if err != nil {
-		return p.ephemeral(fmt.Sprintf("프로젝트 `%s`를 찾을 수 없습니다: %s", projectPath, err.Error())), nil
+		return p.ephemeral(fmt.Sprintf("프로젝트 `%s`` 조회 실패: %s", projectPath, friendlyGitLabError(err))), nil
 	}
 
 	channelName := sanitizeChannelName(gitProject.Path)
@@ -474,7 +474,7 @@ func (p *Plugin) handleMRSummarize(args *model.CommandArgs, project *ChannelProj
 	// Verify MR exists
 	mr, err := glClient.GetMergeRequest(project.ProjectPath, mrID)
 	if err != nil {
-		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, err.Error())), nil
+		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, friendlyGitLabError(err))), nil
 	}
 
 	// Fetch last 50 posts from channel
