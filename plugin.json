@@ -30,6 +30,13 @@
         "default": "https://gitlab.com"
       },
       {
+        "key": "GitLabInternalURL",
+        "display_name": "GitLab 내부 API URL (선택)",
+        "type": "text",
+        "help_text": "같은 컨테이너/네트워크 안에서 GitLab API에 접근할 내부 URL. 설정하면 API 호출에 이 URL을 사용합니다 (예: http://localhost). 비워두면 위 GitLab URL을 사용합니다.",
+        "placeholder": "http://localhost"
+      },
+      {
         "key": "GitLabToken",
         "display_name": "GitLab Personal Access Token",
         "type": "text",

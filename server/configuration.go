@@ -9,11 +9,21 @@ import (
 // Configuration captures the plugin's external configuration as exposed in the Mattermost server
 // configuration, as well as values computed from the configuration.
 type Configuration struct {
-	GitLabURL     string `json:"GitLabURL"`
-	GitLabToken   string `json:"GitLabToken"`
-	WebhookSecret string `json:"WebhookSecret"`
-	FabrixAPIURL  string `json:"FabrixAPIURL"`
-	FabrixAPIKey  string `json:"FabrixAPIKey"`
+	GitLabURL         string `json:"GitLabURL"`
+	GitLabInternalURL string `json:"GitLabInternalURL"`
+	GitLabToken       string `json:"GitLabToken"`
+	WebhookSecret     string `json:"WebhookSecret"`
+	FabrixAPIURL      string `json:"FabrixAPIURL"`
+	FabrixAPIKey      string `json:"FabrixAPIKey"`
+}
+
+// APIBaseURL returns the URL to use for GitLab API calls.
+// Falls back to GitLabURL when GitLabInternalURL is not set.
+func (c *Configuration) APIBaseURL() string {
+	if c.GitLabInternalURL != "" {
+		return c.GitLabInternalURL
+	}
+	return c.GitLabURL
 }
 
 // IsValid checks if the configuration is valid.
@@ -60,6 +70,7 @@ func (p *Plugin) OnConfigurationChange() error {
 	}
 
 	configuration.GitLabURL = strings.TrimRight(strings.TrimSpace(configuration.GitLabURL), "/")
+	configuration.GitLabInternalURL = strings.TrimRight(strings.TrimSpace(configuration.GitLabInternalURL), "/")
 	configuration.GitLabToken = strings.TrimSpace(configuration.GitLabToken)
 
 	p.setConfiguration(configuration)

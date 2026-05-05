@@ -118,7 +118,7 @@ func (p *Plugin) handleMRCommand(args *model.CommandArgs, params []string) (*mod
 		return p.ephemeral("이 채널은 GitLab 프로젝트에 연결되지 않았습니다.\n`/gl project link <project-path>` 명령어로 연결하거나, `/gl channel create <project-path>`로 새 채널을 만드세요."), nil
 	}
 
-	glClient, err := newGitLabClient(config.GitLabURL, config.GitLabToken)
+	glClient, err := newGitLabClient(config.APIBaseURL(), config.GitLabToken)
 	if err != nil {
 		return p.ephemeral("GitLab 연결 실패: " + friendlyGitLabError(err)), nil
 	}
@@ -271,7 +271,7 @@ func (p *Plugin) handleProjectLink(args *model.CommandArgs, projectPath string) 
 		return p.ephemeral("플러그인이 설정되지 않았습니다. 시스템 관리자에게 문의하세요."), nil
 	}
 
-	glClient, err := newGitLabClient(config.GitLabURL, config.GitLabToken)
+	glClient, err := newGitLabClient(config.APIBaseURL(), config.GitLabToken)
 	if err != nil {
 		return p.ephemeral("GitLab 연결 실패: " + friendlyGitLabError(err)), nil
 	}
@@ -366,7 +366,7 @@ func (p *Plugin) handleChannelCreate(args *model.CommandArgs, projectPath string
 		return p.ephemeral("플러그인이 설정되지 않았습니다. 시스템 관리자에게 문의하세요."), nil
 	}
 
-	glClient, err := newGitLabClient(config.GitLabURL, config.GitLabToken)
+	glClient, err := newGitLabClient(config.APIBaseURL(), config.GitLabToken)
 	if err != nil {
 		return p.ephemeral("GitLab 연결 실패: " + friendlyGitLabError(err)), nil
 	}

@@ -54,7 +54,7 @@ func (p *Plugin) handleDiffAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	glClient, err := newGitLabClient(config.GitLabURL, config.GitLabToken)
+	glClient, err := newGitLabClient(config.APIBaseURL(), config.GitLabToken)
 	if err != nil {
 		sendEphemeral("GitLab 연결 실패: " + err.Error())
 		return
@@ -123,7 +123,7 @@ func (p *Plugin) handlePostCommentAction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	glClient, err := newGitLabClient(config.GitLabURL, config.GitLabToken)
+	glClient, err := newGitLabClient(config.APIBaseURL(), config.GitLabToken)
 	if err != nil {
 		sendEphemeral("GitLab 연결 실패: " + err.Error())
 		return
