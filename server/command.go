@@ -150,7 +150,7 @@ func (p *Plugin) handleMRCommand(args *model.CommandArgs, params []string) (*mod
 		if err != nil {
 			return p.ephemeral(fmt.Sprintf("알 수 없는 명령어: `%s`\n`/gl help`로 도움말을 확인하세요.", params[0])), nil
 		}
-		return p.handleMRDetails(project, glClient, mrID)
+		return p.handleMRDetails(args, project, glClient, mrID)
 	}
 }
 
@@ -191,30 +191,49 @@ func (p *Plugin) handleMRList(project *ChannelProject, glClient *GitLabClient, p
 	}, nil
 }
 
-func (p *Plugin) handleMRDetails(project *ChannelProject, glClient *GitLabClient, mrID int) (*model.CommandResponse, *model.AppError) {
+func (p *Plugin) handleMRDetails(args *model.CommandArgs, project *ChannelProject, glClient *GitLabClient, mrID int) (*model.CommandResponse, *model.AppError) {
 	mr, err := glClient.GetMergeRequest(project.ProjectPath, mrID)
 	if err != nil {
 		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, friendlyGitLabError(err))), nil
+	}
+
+	// Post MR details as in-channel slash command response
+	resp := &model.CommandResponse{
+		ResponseType: model.CommandResponseTypeInChannel,
+		Text:         formatMRDetails(mr),
+	}
+
+	// Post file buttons as a separate bot post for reliable rendering across Mattermost versions
+	diffs, err := glClient.GetMergeRequestDiffs(project.ProjectPath, mrID)
+	if err != nil {
+		p.API.LogWarn("MR diff 조회 실패", "mr_id", mrID, "error", err.Error())
+		return resp, nil
 	}
 
 	siteURL := ""
 	if cfg := p.API.GetConfig(); cfg != nil && cfg.ServiceSettings.SiteURL != nil {
 		siteURL = *cfg.ServiceSettings.SiteURL
 	}
-
-	var attachments []*model.SlackAttachment
-	diffs, err := glClient.GetMergeRequestDiffs(project.ProjectPath, mrID)
-	if err != nil {
-		p.API.LogWarn("MR diff 조회 실패", "mr_id", mrID, "error", err.Error())
-	} else {
-		attachments = buildFileButtons(diffs, project.ProjectPath, mr.IID, siteURL)
+	attachments := buildFileButtons(diffs, project.ProjectPath, mr.IID, siteURL)
+	if len(attachments) == 0 {
+		return resp, nil
 	}
 
-	return &model.CommandResponse{
-		ResponseType: model.CommandResponseTypeInChannel,
-		Text:         formatMRDetails(mr),
-		Attachments:  attachments,
-	}, nil
+	if p.botUserID == "" {
+		p.API.LogWarn("botUserID not set — file buttons skipped")
+		return resp, nil
+	}
+
+	post := &model.Post{
+		ChannelId: args.ChannelId,
+		UserId:    p.botUserID,
+	}
+	model.ParseSlackAttachment(post, attachments)
+	if _, appErr := p.API.CreatePost(post); appErr != nil {
+		p.API.LogError("파일 버튼 포스트 실패", "error", appErr.Error())
+	}
+
+	return resp, nil
 }
 
 func (p *Plugin) handleMRDiff(project *ChannelProject, glClient *GitLabClient, mrID int, filterFile string) (*model.CommandResponse, *model.AppError) {
