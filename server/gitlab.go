@@ -257,7 +257,7 @@ func formatDiffSummary(diffs []*MRDiff) string {
 		sb.WriteString(fmt.Sprintf("- `%s`%s\n", path, status))
 	}
 
-	sb.WriteString("\n특정 파일의 diff를 보려면: `/gitlab mr diff <id> <파일경로>`")
+	sb.WriteString("\n특정 파일의 diff를 보려면: `/gl mr diff <id> <파일경로>`")
 	return sb.String()
 }
 

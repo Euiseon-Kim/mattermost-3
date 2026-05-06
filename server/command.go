@@ -135,7 +135,7 @@ func (p *Plugin) handleMRCommand(args *model.CommandArgs, params []string) (*mod
 			return p.ephemeral("유효하지 않은 MR ID: " + params[1]), nil
 		}
 		filterFile := strings.Join(params[2:], " ")
-		return p.handleMRDiff(project, glClient, mrID, filterFile)
+		return p.handleMRDiff(args, project, glClient, mrID, filterFile)
 	case "summarize":
 		if len(params) < 2 {
 			return p.ephemeral("사용법: `/gl mr summarize <id>`"), nil
@@ -236,7 +236,7 @@ func (p *Plugin) handleMRDetails(args *model.CommandArgs, project *ChannelProjec
 	return resp, nil
 }
 
-func (p *Plugin) handleMRDiff(project *ChannelProject, glClient *GitLabClient, mrID int, filterFile string) (*model.CommandResponse, *model.AppError) {
+func (p *Plugin) handleMRDiff(args *model.CommandArgs, project *ChannelProject, glClient *GitLabClient, mrID int, filterFile string) (*model.CommandResponse, *model.AppError) {
 	diffs, err := glClient.GetMergeRequestDiffs(project.ProjectPath, mrID)
 	if err != nil {
 		return p.ephemeral(fmt.Sprintf("MR !%d diff 조회 실패: %s", mrID, friendlyGitLabError(err))), nil
@@ -247,19 +247,34 @@ func (p *Plugin) handleMRDiff(project *ChannelProject, glClient *GitLabClient, m
 		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, friendlyGitLabError(err))), nil
 	}
 
-	header := fmt.Sprintf("### Diff — [!%d %s](%s)\n\n", mr.IID, mr.Title, mr.WebURL)
-
-	var body string
+	// No file specified: show file buttons (same as /gl mr <id>)
 	if filterFile == "" {
-		body = formatDiffSummary(diffs)
-	} else {
-		body = formatFileDiff(diffs, filterFile)
+		header := fmt.Sprintf("### Diff — [!%d %s](%s)\n\n", mr.IID, mr.Title, mr.WebURL)
+		resp := &model.CommandResponse{
+			ResponseType: model.CommandResponseTypeInChannel,
+			Text:         header,
+		}
+		siteURL := ""
+		if cfg := p.API.GetConfig(); cfg != nil && cfg.ServiceSettings.SiteURL != nil {
+			siteURL = *cfg.ServiceSettings.SiteURL
+		}
+		attachments := buildFileButtons(diffs, project.ProjectPath, mr.IID, siteURL)
+		if len(attachments) > 0 && p.botUserID != "" {
+			post := &model.Post{
+				ChannelId: args.ChannelId,
+				UserId:    p.botUserID,
+			}
+			model.ParseSlackAttachment(post, attachments)
+			if _, appErr := p.API.CreatePost(post); appErr != nil {
+				p.API.LogError("파일 버튼 포스트 실패", "error", appErr.Error())
+			}
+		}
+		return resp, nil
 	}
 
-	return &model.CommandResponse{
-		ResponseType: model.CommandResponseTypeInChannel,
-		Text:         header + body,
-	}, nil
+	// File specified: show the diff as ephemeral
+	body := formatFileDiff(diffs, filterFile)
+	return p.ephemeral(fmt.Sprintf("### `%s` diff — [!%d %s](%s)\n\n%s", filterFile, mr.IID, mr.Title, mr.WebURL, body)), nil
 }
 
 // --- Project commands ---
