@@ -483,11 +483,15 @@ func (p *Plugin) handleMRSummarize(args *model.CommandArgs, project *ChannelProj
 		return p.ephemeral("채널 메시지 조회 실패: " + appErr.Error()), nil
 	}
 
-	// Format posts as conversation text (oldest first)
+	// Format posts as conversation text (oldest first), excluding bot and system posts
 	var lines []string
 	for i := len(postList.Order) - 1; i >= 0; i-- {
 		post := postList.Posts[postList.Order[i]]
 		if post.Message == "" || post.Type != "" {
+			continue
+		}
+		// Skip bot posts (MR notifications) and slash command responses
+		if post.UserId == p.botUserID || post.Props["from_webhook"] == "true" {
 			continue
 		}
 		user, uErr := p.API.GetUser(post.UserId)
@@ -499,11 +503,11 @@ func (p *Plugin) handleMRSummarize(args *model.CommandArgs, project *ChannelProj
 	}
 
 	if len(lines) == 0 {
-		return p.ephemeral("요약할 채널 메시지가 없습니다."), nil
+		return p.ephemeral("요약할 사람의 대화 메시지가 없습니다. 채널에서 MR에 대한 논의가 있어야 요약이 가능합니다."), nil
 	}
 
 	conversationText := strings.Join(lines, "\n")
-	prompt := fmt.Sprintf("User: 다음 Mattermost 채널의 코드리뷰 대화 내용을 한국어로 간결하게 요약해줘. MR !%d '%s'에 대한 주요 논의, 결정 사항, 피드백을 중심으로 요약해:\n\n%s",
+	prompt := fmt.Sprintf("User: 아래는 Mattermost 채널에서 나눈 실제 대화 내용이야. 이 대화만을 바탕으로 MR !%d '%s'에 대한 주요 논의, 결정 사항, 피드백을 한국어로 간결하게 요약해줘. 아래 대화 외의 정보는 사용하지 마:\n\n%s",
 		mr.IID, mr.Title, conversationText)
 
 	// Call Fabrix API
