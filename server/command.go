@@ -197,43 +197,10 @@ func (p *Plugin) handleMRDetails(args *model.CommandArgs, project *ChannelProjec
 		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, friendlyGitLabError(err))), nil
 	}
 
-	// Post MR details as in-channel slash command response
-	resp := &model.CommandResponse{
+	return &model.CommandResponse{
 		ResponseType: model.CommandResponseTypeInChannel,
 		Text:         formatMRDetails(mr),
-	}
-
-	// Post file buttons as a separate bot post for reliable rendering across Mattermost versions
-	diffs, err := glClient.GetMergeRequestDiffs(project.ProjectPath, mrID)
-	if err != nil {
-		p.API.LogWarn("MR diff 조회 실패", "mr_id", mrID, "error", err.Error())
-		return resp, nil
-	}
-
-	siteURL := ""
-	if cfg := p.API.GetConfig(); cfg != nil && cfg.ServiceSettings.SiteURL != nil {
-		siteURL = *cfg.ServiceSettings.SiteURL
-	}
-	attachments := buildFileButtons(diffs, project.ProjectPath, mr.IID, siteURL)
-	if len(attachments) == 0 {
-		return resp, nil
-	}
-
-	if p.botUserID == "" {
-		p.API.LogWarn("botUserID not set — file buttons skipped")
-		return resp, nil
-	}
-
-	post := &model.Post{
-		ChannelId: args.ChannelId,
-		UserId:    p.botUserID,
-	}
-	model.ParseSlackAttachment(post, attachments)
-	if _, appErr := p.API.CreatePost(post); appErr != nil {
-		p.API.LogError("파일 버튼 포스트 실패", "error", appErr.Error())
-	}
-
-	return resp, nil
+	}, nil
 }
 
 func (p *Plugin) handleMRDiff(args *model.CommandArgs, project *ChannelProject, glClient *GitLabClient, mrID int, filterFile string) (*model.CommandResponse, *model.AppError) {
@@ -247,13 +214,8 @@ func (p *Plugin) handleMRDiff(args *model.CommandArgs, project *ChannelProject, 
 		return p.ephemeral(fmt.Sprintf("MR !%d 조회 실패: %s", mrID, friendlyGitLabError(err))), nil
 	}
 
-	// No file specified: show file buttons (same as /gl mr <id>)
+	// No file specified: post file buttons via bot (single message), ack silently
 	if filterFile == "" {
-		header := fmt.Sprintf("### Diff — [!%d %s](%s)\n\n", mr.IID, mr.Title, mr.WebURL)
-		resp := &model.CommandResponse{
-			ResponseType: model.CommandResponseTypeInChannel,
-			Text:         header,
-		}
 		siteURL := ""
 		if cfg := p.API.GetConfig(); cfg != nil && cfg.ServiceSettings.SiteURL != nil {
 			siteURL = *cfg.ServiceSettings.SiteURL
@@ -269,7 +231,7 @@ func (p *Plugin) handleMRDiff(args *model.CommandArgs, project *ChannelProject, 
 				p.API.LogError("파일 버튼 포스트 실패", "error", appErr.Error())
 			}
 		}
-		return resp, nil
+		return &model.CommandResponse{ResponseType: model.CommandResponseTypeEphemeral}, nil
 	}
 
 	// File specified: show the diff as ephemeral
