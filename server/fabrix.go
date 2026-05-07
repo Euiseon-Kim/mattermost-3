@@ -12,7 +12,8 @@ import (
 )
 
 // callFabrix posts a prompt to the Fabrix LLM API and returns the response text.
-func callFabrix(apiURL, apiKey, channelID, text string) (string, error) {
+// p is used for logging the raw response to aid debugging.
+func callFabrix(p *Plugin, apiURL, apiKey, channelID, text string) (string, error) {
 	form := url.Values{}
 	form.Set("text", text)
 	form.Set("channel_id", channelID)
@@ -36,6 +37,8 @@ func callFabrix(apiURL, apiKey, channelID, text string) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "failed to read response body")
 	}
+
+	p.API.LogInfo("Fabrix raw response", "status", resp.StatusCode, "body", string(body))
 
 	if resp.StatusCode >= 400 {
 		return "", fmt.Errorf("Fabrix API 오류 (HTTP %d): %s", resp.StatusCode, string(body))

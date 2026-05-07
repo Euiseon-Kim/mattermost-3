@@ -507,7 +507,7 @@ func (p *Plugin) handleMRSummarize(args *model.CommandArgs, project *ChannelProj
 		mr.IID, mr.Title, conversationText)
 
 	// Call Fabrix API
-	summary, err := callFabrix(config.FabrixAPIURL, config.FabrixAPIKey, args.ChannelId, prompt)
+	summary, err := callFabrix(p, config.FabrixAPIURL, config.FabrixAPIKey, args.ChannelId, prompt)
 	if err != nil {
 		return p.ephemeral("AI 요약 실패: " + err.Error()), nil
 	}
