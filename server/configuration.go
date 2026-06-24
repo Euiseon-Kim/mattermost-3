@@ -9,12 +9,13 @@ import (
 // Configuration captures the plugin's external configuration as exposed in the Mattermost server
 // configuration, as well as values computed from the configuration.
 type Configuration struct {
-	GitLabURL         string `json:"GitLabURL"`
-	GitLabInternalURL string `json:"GitLabInternalURL"`
-	GitLabToken       string `json:"GitLabToken"`
-	WebhookSecret     string `json:"WebhookSecret"`
-	FabrixAPIURL      string `json:"FabrixAPIURL"`
-	FabrixAPIKey      string `json:"FabrixAPIKey"`
+	GitLabURL            string `json:"GitLabURL"`
+	GitLabInternalURL    string `json:"GitLabInternalURL"`
+	GitLabToken          string `json:"GitLabToken"`
+	WebhookSecret        string `json:"WebhookSecret"`
+	FabrixAPIURL         string `json:"FabrixAPIURL"`
+	FabrixAPIKey         string `json:"FabrixAPIKey"`
+	TeamProjectMappings  string `json:"TeamProjectMappings"`
 }
 
 // APIBaseURL returns the URL to use for GitLab API calls.
@@ -38,6 +39,28 @@ func (c *Configuration) IsValid() error {
 		return errors.New("GitLab Personal Access Token을 입력해주세요")
 	}
 	return nil
+}
+
+// ParseTeamProjectMappings parses the TeamProjectMappings text into a slice of TeamProjectMapping.
+// Format: one "teamname:group/project" per line. Lines starting with '#' or blank are skipped.
+func (c *Configuration) ParseTeamProjectMappings() []TeamProjectMapping {
+	var result []TeamProjectMapping
+	for _, line := range strings.Split(c.TeamProjectMappings, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		idx := strings.Index(line, ":")
+		if idx < 1 || idx == len(line)-1 {
+			continue
+		}
+		teamName := strings.TrimSpace(line[:idx])
+		projectPath := strings.TrimSpace(line[idx+1:])
+		if teamName != "" && projectPath != "" {
+			result = append(result, TeamProjectMapping{TeamName: teamName, ProjectPath: projectPath})
+		}
+	}
+	return result
 }
 
 func (p *Plugin) getConfiguration() *Configuration {
@@ -72,8 +95,11 @@ func (p *Plugin) OnConfigurationChange() error {
 	configuration.GitLabURL = strings.TrimRight(strings.TrimSpace(configuration.GitLabURL), "/")
 	configuration.GitLabInternalURL = strings.TrimRight(strings.TrimSpace(configuration.GitLabInternalURL), "/")
 	configuration.GitLabToken = strings.TrimSpace(configuration.GitLabToken)
+	configuration.TeamProjectMappings = strings.TrimSpace(configuration.TeamProjectMappings)
 
 	p.setConfiguration(configuration)
+
+	go p.provisionTeamChannels(configuration)
 
 	return nil
 }

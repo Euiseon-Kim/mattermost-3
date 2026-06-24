@@ -274,7 +274,7 @@ func (p *Plugin) handleProjectLink(args *model.CommandArgs, projectPath string) 
 
 	gitProject, err := glClient.GetProject(projectPath)
 	if err != nil {
-		return p.ephemeral(fmt.Sprintf("프로젝트 `%s`` 조회 실패: %s", projectPath, friendlyGitLabError(err))), nil
+		return p.ephemeral(fmt.Sprintf("프로젝트 `%s` 조회 실패: %s", projectPath, friendlyGitLabError(err))), nil
 	}
 
 	project := &ChannelProject{
@@ -369,7 +369,7 @@ func (p *Plugin) handleChannelCreate(args *model.CommandArgs, projectPath string
 
 	gitProject, err := glClient.GetProject(projectPath)
 	if err != nil {
-		return p.ephemeral(fmt.Sprintf("프로젝트 `%s`` 조회 실패: %s", projectPath, friendlyGitLabError(err))), nil
+		return p.ephemeral(fmt.Sprintf("프로젝트 `%s` 조회 실패: %s", projectPath, friendlyGitLabError(err))), nil
 	}
 
 	channelName := sanitizeChannelName(gitProject.Path)

@@ -64,6 +64,13 @@
         "type": "text",
         "help_text": "Fabrix API 인증키 (없으면 빈칸)",
         "secret": true
+      },
+      {
+        "key": "TeamProjectMappings",
+        "display_name": "팀 → 프로젝트 매핑",
+        "type": "text",
+        "help_text": "Mattermost 팀과 GitLab 프로젝트를 매핑합니다. 한 줄에 하나씩 '팀이름:프로젝트/경로' 형식으로 입력하세요. 저장 시 채널이 자동 생성·연결됩니다. 예시: myteam:backend-group/api-service",
+        "placeholder": "myteam:group/project-path"
       }
     ]
   }
